@@ -13,20 +13,20 @@ Nothing here measures your model. It measures whether you were honest about how 
 
 Evals drift. Not because anyone lies, but because the ruler is soft: a threshold moves from 0.85 to 0.80, three hard cases quietly leave the set, a metric is swapped for a friendlier one — and the number goes up. Every step is defensible on its own. The result is a benchmark that only ever improves.
 
-The fix is not more rigour in the moment. It is making the ruler expensive to change *after* you have seen the outcome.
+The fix is not more rigour in the moment. It is making the ruler expensive to change _after_ you have seen the outcome.
 
 ## What gets hashed
 
 Only the ruler:
 
-| Hashed | Not hashed |
-| --- | --- |
-| `metrics` | prompt |
-| `thresholds` | model / checkpoint |
-| `dataset` (composition) | agent scaffold |
+| Hashed                      | Not hashed                |
+| --------------------------- | ------------------------- |
+| `metrics`                   | prompt                    |
+| `thresholds`                | model / checkpoint        |
+| `dataset` (composition)     | agent scaffold            |
 | `references` (gold answers) | temperature, seeds, infra |
 
-This split is the whole design. You are *supposed* to change the system under test — that is the experiment. The ruler is what has to hold still for the comparison to mean anything.
+This split is the whole design. You are _supposed_ to change the system under test — that is the experiment. The ruler is what has to hold still for the comparison to mean anything.
 
 ## Usage
 
@@ -68,7 +68,7 @@ pip install oathgate
 
 A JSON file with the four ruler keys. Anything else — including a `system` block describing what you are testing — is ignored by the hash and free to change.
 
-See [`examples/spec.json`](examples/spec.json).
+See [`examples/spec.json`](https://github.com/UladzKha/oathgate/blob/main/examples/spec.json).
 
 ## Status
 
