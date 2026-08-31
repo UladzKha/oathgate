@@ -1,0 +1,3 @@
+{"id": "1", "input": "Ship it by Friday, and drop the dark mode toggle.", "expected": ["deadline:friday", "remove:dark-mode-toggle"]}
+{"id": "2", "input": "Can we make the export button blue?", "expected": ["change:export-button-colour"]}
+{"id": "3", "input": "Nothing to change on my side.", "expected": []}

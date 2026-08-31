@@ -1,0 +1,22 @@
+{
+  "name": "synthetic-extraction-eval",
+  "metrics": [
+    "exact_match",
+    "f1"
+  ],
+  "thresholds": {
+    "exact_match": 0.8,
+    "f1": 0.9
+  },
+  "dataset": {
+    "path": "examples/dataset.jsonl",
+    "n": 3
+  },
+  "references": "examples/dataset.jsonl",
+  "system": {
+    "_comment": "Everything under `system` is intentionally NOT hashed.",
+    "model": "another-model:latest",
+    "prompt": "prompts/extract.md",
+    "temperature": 0.0
+  }
+}
