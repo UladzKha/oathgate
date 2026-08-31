@@ -1,0 +1,9 @@
+[project]
+name = "oathgate"
+version = "0.0.1"
+
+[project.scripts]
+oathgate = "oathgate.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/oathgate"]
