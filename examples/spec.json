@@ -1,22 +1,29 @@
 {
   "name": "synthetic-extraction-eval",
   "metrics": [
-    "exact_match",
-    "f1"
+    {
+      "name": "f1",
+      "impl": "scorers/f1.py",
+      "params": {
+        "normalize": "lower"
+      }
+    },
+    {
+      "name": "exact_match",
+      "imp": "scorers/em.py",
+      "params": {}
+    }
   ],
   "thresholds": {
-    "exact_match": 0.8,
-    "f1": 0.9
+    "f1": 0.85,
+    "exact_match": 0.80
   },
-  "dataset": {
-    "path": "examples/dataset.jsonl",
-    "n": 3
-  },
-  "references": "examples/dataset.jsonl",
+  "dataset": [
+    "data/eval.jsonl"
+  ],
+  "references": "data/golden.jsonl",
   "system": {
-    "_comment": "Everything under `system` is intentionally NOT hashed.",
-    "model": "another-model:latest",
-    "prompt": "prompts/extract.md",
+    "model": "qwen3.8:27b",
     "temperature": 0.0
   }
 }
