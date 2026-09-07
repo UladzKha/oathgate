@@ -1,4 +1,4 @@
-from oathgate.spec import _canon_value, SpecError, _hash_bytes
+from oathgate.spec import _canon_value, SpecError, _hash_bytes, canonical_payload, ruler_hash
 
 import pytest
 import datetime
@@ -55,4 +55,19 @@ def test_set_rejected():
 
 def test_hash_bytes_matches_known_sha256():
     assert _hash_bytes(b"") == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    
+
+def test_canonical_payload_structure():
+    result = canonical_payload({}, {"a.py": b""})
+    assert result["_format"] == "gate-spec-v1"
+    assert result["spec"] == {}
+    assert result["files"]["a.py"] == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+
+def test_ruler_hash():
+    payload = canonical_payload({}, {"a.py": b"", "b.py": b""})
+    result = ruler_hash(payload)
+    assert len(result) == 64
+
+def test_ruler_hash_ignores_key_order():
+    a = canonical_payload({}, {"a.py": b"", "b.py": b""})
+    b = canonical_payload({}, {"b.py": b"", "a.py": b""})
+    assert ruler_hash(a) == ruler_hash(b)

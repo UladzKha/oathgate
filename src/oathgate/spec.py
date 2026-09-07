@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime
 import hashlib
+import json
 import math
 import re
 import unicodedata
@@ -62,3 +63,17 @@ def _canon_value(value: Any, *, where: str) -> Any:
 
 def _hash_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+def canonical_payload(spec: dict[str, Any], files: dict[str, bytes]) -> dict[str, Any]:
+    """Build the deterministic structure that gets hashed."""
+    return {
+        "_format": "gate-spec-v1",
+        "spec": _canon_value(spec, where="spec"),
+        "files": { path: _hash_bytes(content) for path, content in files.items()},
+    }
+
+def ruler_hash(payload: dict[str, Any]) -> str:
+    return _hash_bytes(json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8"))
+
+
+
