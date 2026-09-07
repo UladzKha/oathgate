@@ -1,4 +1,4 @@
-from oathgate.spec import _canon_value, SpecError
+from oathgate.spec import _canon_value, SpecError, _hash_bytes
 
 import pytest
 import datetime
@@ -53,3 +53,6 @@ def test_set_rejected():
     with pytest.raises(SpecError):
         _canon_value({1, 2, 3}, where="x")
 
+def test_hash_bytes_matches_known_sha256():
+    assert _hash_bytes(b"") == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    
