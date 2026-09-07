@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime
+import hashlib
 import math
 import re
 import unicodedata
@@ -58,3 +59,6 @@ def _canon_value(value: Any, *, where: str) -> Any:
         return value.isoformat()
     
     raise SpecError(f"{where}: unsupported value type {type(value).__name__}")
+
+def _hash_bytes(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
