@@ -1,0 +1,5 @@
+[dataset]
+path = "examples/golden.jsonl"
+
+[metrics.accuracy]
+impl = "examples/accuracy.py"
