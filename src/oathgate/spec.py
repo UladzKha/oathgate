@@ -10,9 +10,6 @@ import re
 import unicodedata
 from typing import Any
 
-
-
-_DRIVE_LETTER = re.compile(r"^[a-zA-Z]:\\")
 _MAX_EXACT_INT = 2 ** 53
 
 class SpecError(Exception):

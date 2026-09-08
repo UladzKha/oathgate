@@ -1,6 +1,6 @@
 [project]
 name = "oathgate"
-version = "0.0.2"
+version = "0.0.3"
 description = "Freeze the eval scoring spec and your prediction before the run."
 readme = "README.md"
 requires-python = ">=3.11"
