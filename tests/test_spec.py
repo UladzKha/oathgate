@@ -1,4 +1,4 @@
-from oathgate.spec import _canon_value, SpecError, _hash_bytes, canonical_payload, load_spec, ruler_hash
+from oathgate.spec import _canon_value, SpecError, _hash_bytes, canonical_payload, collect_files, load_spec, ruler_hash
 
 import pytest
 import datetime
@@ -152,3 +152,39 @@ impl = "scorers/accuracy.py"
 extra_files = ["file1.txt", "file2.txt"]""")
     result = load_spec(spec_file)
     assert result["metrics"]["accuracy"]["extra_files"] == ["file1.txt", "file2.txt"]
+
+def test_collect_files_reads_all(tmp_path):
+    (tmp_path / "data").mkdir()
+    (tmp_path / "data" / "golden.jsonl").write_bytes(b"line1")
+    (tmp_path / "scorers").mkdir()
+    (tmp_path / "scorers" / "accuracy.py").write_bytes(b"code")
+
+    spec = {
+        "dataset": {"path": "data/golden.jsonl"},
+        "metrics": {"accuracy": {"impl": "scorers/accuracy.py"}},
+    }
+    result = collect_files(spec, tmp_path)
+
+    assert result == {
+        "data/golden.jsonl": b"line1",
+        "scorers/accuracy.py": b"code",
+    }
+
+def test_collect_files_reads_extra_files(tmp_path):
+    (tmp_path / "data").mkdir()
+    (tmp_path / "data" / "golden.jsonl").write_bytes(b"line1")
+    (tmp_path / "scorers").mkdir()
+    (tmp_path / "scorers" / "accuracy.py").write_bytes(b"code")
+    (tmp_path / "scorers" / "common.py").write_bytes(b"common code")
+
+    spec = {
+        "dataset": {"path": "data/golden.jsonl"},
+        "metrics": {"accuracy": {"impl": "scorers/accuracy.py", "extra_files": ['scorers/common.py']}},
+    }
+    result = collect_files(spec, tmp_path)
+
+    assert result == {
+        "data/golden.jsonl": b"line1",
+        "scorers/accuracy.py": b"code",
+        "scorers/common.py": b"common code"
+    }

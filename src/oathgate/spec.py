@@ -111,5 +111,23 @@ def load_spec(path: str | Path) -> dict[str, Any]:
         
     return spec
 
+def collect_files(spec: dict[str, Any], base_dir: Path) -> dict[str, bytes]:
+    result: dict[str, bytes] = {}
+    path_str = spec["dataset"]["path"]
+    full_path = base_dir / path_str
+
+    result[path_str] = full_path.read_bytes()
+
+    for metric in spec["metrics"].values():
+        impl_path = metric["impl"]
+        full_impl_path = base_dir / impl_path
+        result[impl_path] = full_impl_path.read_bytes()
+
+        if "extra_files" in metric:
+            for extra_path in metric["extra_files"]:
+                full_extra_path = base_dir / extra_path
+                result[extra_path] = full_extra_path.read_bytes()
+
+    return result
 
 
