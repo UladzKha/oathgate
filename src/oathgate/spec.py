@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import tomllib
 import datetime
 import hashlib
 import json
 import math
+from pathlib import Path
 import re
 import unicodedata
 from typing import Any
+
 
 
 _DRIVE_LETTER = re.compile(r"^[a-zA-Z]:\\")
@@ -74,6 +77,39 @@ def canonical_payload(spec: dict[str, Any], files: dict[str, bytes]) -> dict[str
 
 def ruler_hash(payload: dict[str, Any]) -> str:
     return _hash_bytes(json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8"))
+
+def load_spec(path: str | Path) -> dict[str, Any]:
+    """Read and parse a spec file from disk."""
+    with open(path, "rb") as f:
+        spec = tomllib.load(f)
+
+    if "dataset" not in spec:
+        raise SpecError(f"missing [dataset] section in {path}")
+
+    if "path" not in spec["dataset"]:
+        raise SpecError(f"missing [dataset].path in {path}")
+
+    if "metrics" not in spec:
+        raise SpecError(f"missing [metrics] section in {path}")
+
+    if not spec["metrics"]:
+        raise SpecError(f"empty [metrics] section in {path}")
+
+    for name, metric in spec["metrics"].items():
+        if "impl" not in metric:
+            raise SpecError(f"missing [metrics].{name}.impl in {path}")
+
+        if "extra_files" not in metric:
+            continue
+
+        if not isinstance(metric["extra_files"], list):
+            raise SpecError(f"[metrics].{name}.extra_files must be a list in {path}")
+
+        for value in metric["extra_files"]:
+            if not isinstance(value, str):
+                raise SpecError(f"[metrics].{name}.extra_files must be a list of strings in {path}")
+        
+    return spec
 
 
 

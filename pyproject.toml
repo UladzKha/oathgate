@@ -3,7 +3,7 @@ name = "oathgate"
 version = "0.0.2"
 description = "Freeze the eval scoring spec and your prediction before the run."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "Uladzimir Khadakouski" }]
 keywords = ["evaluation", "evals", "llm", "benchmark", "reproducibility"]

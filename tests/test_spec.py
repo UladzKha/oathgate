@@ -1,4 +1,4 @@
-from oathgate.spec import _canon_value, SpecError, _hash_bytes, canonical_payload, ruler_hash
+from oathgate.spec import _canon_value, SpecError, _hash_bytes, canonical_payload, load_spec, ruler_hash
 
 import pytest
 import datetime
@@ -71,3 +71,84 @@ def test_ruler_hash_ignores_key_order():
     a = canonical_payload({}, {"a.py": b"", "b.py": b""})
     b = canonical_payload({}, {"b.py": b"", "a.py": b""})
     assert ruler_hash(a) == ruler_hash(b)
+
+def test_load_spec_reads_valid_file(tmp_path):
+    spec_file = tmp_path / "oathgate.toml"
+    spec_file.write_text("""
+[dataset]
+path = "data/golden.jsonl"
+
+[metrics.accuracy]
+impl = "scorers/accuracy.py"
+""")
+    result = load_spec(spec_file)
+    assert result["dataset"]["path"] == "data/golden.jsonl"
+
+def test_load_spec_missing_dataset(tmp_path):
+    spec_file = tmp_path / "oathgate.toml"
+    spec_file.write_text("")
+
+    with pytest.raises(SpecError, match="missing \\[dataset\\] section"):
+        load_spec(spec_file)
+
+def test_load_spec_missing_dataset_path(tmp_path):
+    spec_file = tmp_path / "oathgate.toml"
+    spec_file.write_text("""[dataset]
+""")
+    
+    with pytest.raises(SpecError, match="missing \\[dataset\\].path"):
+        load_spec(spec_file)
+
+def test_load_spec_missing_metrics(tmp_path):
+    spec_file = tmp_path / "oathgate.toml"
+    spec_file.write_text("""[dataset]
+path = "data/golden.jsonl"
+""")
+    with pytest.raises(SpecError, match="missing \\[metrics\\] section"):
+        load_spec(spec_file)
+
+def test_load_spec_empty_metrics(tmp_path):
+    spec_file = tmp_path / "oathgate.toml"
+    spec_file.write_text("""[dataset]
+path = "data/golden.jsonl"
+[metrics]""")
+    with pytest.raises(SpecError, match="empty \\[metrics\\] section"):
+        load_spec(spec_file)
+
+def test_load_spec_missing_metric_impl(tmp_path):
+    spec_file = tmp_path / "oathgate.toml"
+    spec_file.write_text("""[dataset]
+path = "data/golden.jsonl"
+[metrics.accuracy]""")
+    with pytest.raises(SpecError, match="missing \\[metrics\\].accuracy.impl"):
+        load_spec(spec_file)
+
+def test_load_spec_extra_files_not_list(tmp_path):
+    spec_file = tmp_path / "oathgate.toml"
+    spec_file.write_text("""[dataset]
+path = "data/golden.jsonl"
+[metrics.accuracy]
+impl = "scorers/accuracy.py"
+extra_files = "not a list" """)
+    with pytest.raises(SpecError, match="extra_files must be a list"):
+        load_spec(spec_file)
+
+def test_load_spec_extra_files_not_strings(tmp_path):
+    spec_file = tmp_path / "oathgate.toml"
+    spec_file.write_text("""[dataset]
+path = "data/golden.jsonl"
+[metrics.accuracy]
+impl = "scorers/accuracy.py"
+extra_files = [1, 2, 3]""")
+    with pytest.raises(SpecError, match="extra_files must be a list of strings"):
+        load_spec(spec_file)
+
+def test_load_spec_reads_valid_file_with_extra_files(tmp_path):
+    spec_file = tmp_path / "oathgate.toml"
+    spec_file.write_text("""[dataset]
+path = "data/golden.jsonl"
+[metrics.accuracy]
+impl = "scorers/accuracy.py"
+extra_files = ["file1.txt", "file2.txt"]""")
+    result = load_spec(spec_file)
+    assert result["metrics"]["accuracy"]["extra_files"] == ["file1.txt", "file2.txt"]
