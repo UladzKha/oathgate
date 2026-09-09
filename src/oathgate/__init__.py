@@ -1,3 +1,5 @@
 """oathgate — freeze the measurement ruler before you run the eval."""
 
-__version__ = "0.0.1"
+from importlib.metadata import version
+
+__version__ = version("oathgate")
