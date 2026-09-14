@@ -111,9 +111,14 @@ def ruler_hash(payload: dict[str, Any]) -> str:
 
 def load_spec(path: str | Path) -> dict[str, Any]:
     """Read and parse a spec file from disk."""
-    with open(path, "rb") as f:
-        spec = tomllib.load(f)
-
+    try:
+        with open(path, "rb") as f:
+            spec = tomllib.load(f)
+    except OSError as e:
+        raise SpecError(f"cannot read {path}: {e}") from e
+    except tomllib.TOMLDecodeError as e:
+        raise SpecError(f"invalid TOML in {path}: {e}") from e
+        
     if "dataset" not in spec:
         raise SpecError(f"missing [dataset] section in {path}")
 
@@ -186,5 +191,15 @@ def collect_files(spec: dict[str, Any], base_dir: Path) -> dict[str, bytes]:
                     raise SpecError(f"cannot read {extra_path}: {e}") from e
 
     return result
+
+def compute_ruler(spec_path: Path) -> tuple[str, dict[str, Any], dict[str, bytes]]:
+    """Load, hash and return the ruler for a spec: (hash, spec, files)."""
+    base_dir = spec_path.parent
+    spec = load_spec(spec_path)
+    files = collect_files(spec, base_dir)
+    payload = canonical_payload(spec, files)
+    digest = ruler_hash(payload)
+
+    return digest, spec, files
 
 
