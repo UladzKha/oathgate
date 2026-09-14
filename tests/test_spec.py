@@ -1,4 +1,4 @@
-from oathgate.spec import _canon_value, SpecError, _hash_bytes, canonical_payload, collect_files, load_spec, ruler_hash
+from oathgate.spec import _canon_value, SpecError, _hash_bytes, _normalize_path, canonical_payload, collect_files, load_spec, ruler_hash
 
 import pytest
 import datetime
@@ -188,3 +188,56 @@ def test_collect_files_reads_extra_files(tmp_path):
         "scorers/accuracy.py": b"code",
         "scorers/common.py": b"common code"
     }
+
+def test_path_spelling_does_not_change_hash(tmp_path):
+    (tmp_path / "data.csv").write_text("id,label\n1, cat\n")
+    (tmp_path / "scorer.py").write_text("def score(row): \n return 1.0\n")
+    (tmp_path / "a.toml").write_text("""
+[dataset]
+path = "data.csv"
+
+[metrics.accuracy]
+impl = "scorer.py"
+""")
+
+    (tmp_path / "b.toml").write_text("""
+[dataset]
+path = "./data.csv"
+
+[metrics.accuracy]
+impl = "./scorer.py"
+""")
+    spec_a = load_spec(tmp_path / "a.toml")
+    spec_b = load_spec(tmp_path / "b.toml")
+    files_a = collect_files(spec_a, tmp_path)
+    files_b = collect_files(spec_b, tmp_path)
+    payload_a = canonical_payload(spec_a, files_a)
+    payload_b = canonical_payload(spec_b, files_b)
+    hash_a = ruler_hash(payload_a)
+    hash_b = ruler_hash(payload_b)
+
+    assert hash_a == hash_b
+
+def test_absolute_path_rejected():
+    with pytest.raises(SpecError, match="paths are relative to the spec"):
+        _normalize_path("/etc/passwd", where="t")
+
+def test_empty_path_rejected():
+    with pytest.raises(SpecError, match="path is empty"):
+        _normalize_path("", where="t")
+
+def test_drive_letter_in_the_path_rejected():
+    with pytest.raises(SpecError, match="drive letter in path"):
+        _normalize_path("c:/user/test/scorer.py", where="t")
+
+def test_backslash_in_path_rejected():
+    with pytest.raises(SpecError, match="backslash in path"):
+        _normalize_path("\\etc/passwd", where="t")
+
+def test_escapes_the_directory_rejected():
+    with pytest.raises(SpecError, match="escapes the spec directory"):
+        _normalize_path("../../user", where="t")
+
+def test_dot_dot_inside_path_collpses():
+    assert _normalize_path("sub/../data.csv", where="t") == "data.csv"
+    assert _normalize_path("a/b/../c.csv", where="t") == "a/c.csv"

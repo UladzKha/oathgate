@@ -5,7 +5,7 @@ import datetime
 import hashlib
 import json
 import math
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import re
 import unicodedata
 from typing import Any
@@ -14,7 +14,41 @@ _MAX_EXACT_INT = 2 ** 53
 
 class SpecError(Exception):
         """Any problem with reading, validating or canonicalizing a spec."""
-   
+
+def _normalize_path(raw: str, *, where: str) -> str:
+    """Normalize a path from the spec into a stable relative POSIX key."""
+    if not raw:
+        raise SpecError(f"{where}: path is empty")
+
+    if "\\" in raw:
+        raise SpecError(f"{where}: backslash in path {raw!r}")
+
+    if re.match(r"^[A-Za-z]:", raw):
+        raise SpecError(f"{where}: {raw!r} drive letter in path")
+
+    if raw.startswith("/"):
+        raise SpecError(f"{where}: absolute path {raw!r}; paths are relative to the spec")
+
+    parts = PurePosixPath(raw).parts
+    result: list[str] = []
+
+    for part in parts:
+        if part == ".":
+            continue
+
+        if part == "..":
+            if not result:
+                raise SpecError(f"{where}: path {raw!r} escapes the spec directory")
+
+            result.pop()
+            continue
+
+        result.append(part)
+
+    if not result:
+        raise SpecError(f"{where}: path {raw!r} does not name a file")
+
+    return "/".join(result)
 
 def _canon_value(value: Any, *, where: str) -> Any:
     """Bring a spec value to a canonical form before serialization."""
@@ -92,9 +126,19 @@ def load_spec(path: str | Path) -> dict[str, Any]:
     if not spec["metrics"]:
         raise SpecError(f"empty [metrics] section in {path}")
 
+    if not isinstance(spec["dataset"]["path"], str):
+        raise SpecError(f"[dataset].path must be a string in {path}")
+
+    spec["dataset"]["path"] = _normalize_path(spec["dataset"]["path"], where="dataset.path")
+
     for name, metric in spec["metrics"].items():
         if "impl" not in metric:
             raise SpecError(f"missing [metrics].{name}.impl in {path}")
+
+        if not isinstance(metric["impl"], str):
+            raise SpecError(f"[metrics].{name}.impl must be a string in {path}")
+
+        metric["impl"] = _normalize_path(metric["impl"], where=f"metrics.{name}.impl")
 
         if "extra_files" not in metric:
             continue
@@ -105,7 +149,12 @@ def load_spec(path: str | Path) -> dict[str, Any]:
         for value in metric["extra_files"]:
             if not isinstance(value, str):
                 raise SpecError(f"[metrics].{name}.extra_files must be a list of strings in {path}")
-        
+
+        metric["extra_files"] = [
+            _normalize_path(value, where=f"metrics.{name}.extra_files")
+            for value in metric["extra_files"]
+        ]
+
     return spec
 
 def collect_files(spec: dict[str, Any], base_dir: Path) -> dict[str, bytes]:
@@ -113,17 +162,28 @@ def collect_files(spec: dict[str, Any], base_dir: Path) -> dict[str, bytes]:
     path_str = spec["dataset"]["path"]
     full_path = base_dir / path_str
 
-    result[path_str] = full_path.read_bytes()
+    try:
+        result[path_str] = full_path.read_bytes()
+    except OSError as e:
+        raise SpecError(f"cannot read {path_str}: {e}") from e
 
-    for metric in spec["metrics"].values():
+    for name, metric in spec["metrics"].items():
         impl_path = metric["impl"]
         full_impl_path = base_dir / impl_path
-        result[impl_path] = full_impl_path.read_bytes()
+
+        try:
+            result[impl_path] = full_impl_path.read_bytes()
+        except OSError as e:
+            raise SpecError(f"cannot read {impl_path}: {e}") from e
 
         if "extra_files" in metric:
             for extra_path in metric["extra_files"]:
                 full_extra_path = base_dir / extra_path
-                result[extra_path] = full_extra_path.read_bytes()
+
+                try:
+                    result[extra_path] = full_extra_path.read_bytes()
+                except OSError as e:
+                    raise SpecError(f"cannot read {extra_path}: {e}") from e
 
     return result
 
