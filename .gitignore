@@ -5,6 +5,7 @@ venv/
 dist/
 build/
 *.egg-info/
-oath.lock.json
 .pytest_cache/
 .DS_Store
+/oathgate.lock
+oathgate.lock.tmp
