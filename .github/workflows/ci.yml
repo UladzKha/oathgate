@@ -29,7 +29,7 @@ jobs:
           pip install pytest
 
       - name: Check the ruler
-        run: uv run oathgate check
+        run: oathgate check
  
       - name: Run tests
         run: pytest -q
