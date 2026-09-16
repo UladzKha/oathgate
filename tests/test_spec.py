@@ -1,7 +1,23 @@
-from oathgate.spec import _canon_value, SpecError, _hash_bytes, _normalize_path, canonical_payload, collect_files, load_spec, ruler_hash
+from datetime import datetime, timezone, date
 
 import pytest
-import datetime
+
+from oathgate.lock import LOCK_NAME, read_lock, write_lock
+from oathgate.spec import _canon_value, SpecError, _hash_bytes, _normalize_path, canonical_payload, collect_files, load_spec, ruler_hash, compute_ruler
+from oathgate.cli import main
+
+FIXED_NOW = datetime(2026, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+
+@pytest.fixture
+def tree(tmp_path):
+    """A minimal valid spec tree: spec, dataset, scorer."""
+    (tmp_path / "data.csv").write_text("id,label\n1,cat\n")
+    (tmp_path / "scorer.py").write_text("def score(row):\n  return 1.0\n")
+    (tmp_path / "oathgate.toml").write_text(
+        '[dataset]\npath = "data.csv"\n\n[metrics.accuracy]\nimpl = "scorer.py"\n'
+    )
+    return tmp_path
+
 
 
 def test_int_and_float_hash_the_same():
@@ -39,7 +55,7 @@ def test_non_string_key_raises():
         _canon_value({1: "a"}, where="x")
 
 def test_date_is_ISO_string():
-    assert _canon_value(datetime.date(2023, 1, 1), where="x") == "2023-01-01"
+    assert _canon_value(date(2023, 1, 1), where="x") == "2023-01-01"
 
 def test_tuple_and_list_are_equivalent():
     assert _canon_value((1, 2), where="x") == _canon_value([1, 2], where="x")
@@ -241,3 +257,114 @@ def test_escapes_the_directory_rejected():
 def test_dot_dot_inside_path_collpses():
     assert _normalize_path("sub/../data.csv", where="t") == "data.csv"
     assert _normalize_path("a/b/../c.csv", where="t") == "a/c.csv"
+
+def test_lock_hash_matches_freeze(tree):
+    digest, _, _ = compute_ruler(tree / "oathgate.toml")
+
+    write_lock(
+        tree / LOCK_NAME,
+        digest=digest,
+        spec_name="oathgate.toml",
+        metric="accuracy",
+        operator=">=",
+        value=0.85,
+        now=FIXED_NOW
+    )
+
+    lock = read_lock(tree / LOCK_NAME)
+    assert lock["ruler_hash"] == digest
+
+def test_predict_unknown_metric_writes_nothing(tree):
+    code = main(
+        ["predict", "--spec", str(tree / "oathgate.toml"),
+         "--metric", "f1", "--at-least", "0.9"]
+    )
+
+    assert code == 2
+    assert not (tree / LOCK_NAME).exists()
+
+def test_predict_refuses_to_overwrite(tree):
+    args = ["predict", "--spec", str(tree / "oathgate.toml"),
+            "--metric", "accuracy", "--at-least", "0.85"]
+
+    assert main(args) == 0
+    before = (tree / LOCK_NAME).read_text()
+
+    assert main(args) == 2
+    assert (tree / LOCK_NAME).read_text() == before
+
+def test_force_moves_previous_into_history(tree):
+    spec = str(tree / "oathgate.toml")
+    base = ["predict", "--spec", spec, "--metric", "accuracy"]
+
+    assert main(base + ["--at-least", "0.85"]) == 0
+    assert main(base + ["--at-least", "0.90", "--force"]) == 0
+
+    lock = read_lock(tree / LOCK_NAME)
+
+    assert lock["predictions"][0]["value"] == 0.90
+    assert len(lock["history"]) == 1
+
+    old = lock["history"][0]
+    assert old["predictions"][0]["value"] == 0.85
+    assert "superseded_at" in old
+    assert "history" not in old
+
+def test_check_passes_then_fails_after_edit(tree):
+    spec = str(tree / "oathgate.toml")
+
+    assert main(["predict", "--spec", spec,
+                "--metric", "accuracy", "--at-least", "0.85"
+                 ]) == 0
+    assert main(["check", "--spec", spec]) == 0
+
+    (tree / "data.csv").write_text("id,label\n1,dog\n")
+    assert main(["check", "--spec", spec]) == 1
+
+def test_check_without_lock_cannot_compute(tree):
+    assert main(["check", "--spec", str(tree / "oathgate.toml")]) == 2
+
+def test_check_fails_after_scorer_edit(tree):
+    spec = str(tree / "oathgate.toml")
+
+    assert main(["predict", "--spec", spec, "--metric", "accuracy", "--at-least", "0.85"]) == 0
+
+    (tree / "scorer.py").write_text("def score(row):\n  return 0.0\n")
+    assert main(["check", "--spec", str(tree / "oathgate.toml")]) == 1
+
+def test_check_rejects_lock_that_is_not_an_object(tree):
+    (tree / LOCK_NAME).write_text("42\n")
+    assert main(["check", "--spec", str(tree / "oathgate.toml")]) == 2
+
+def test_check_rejects_broken_json(tree):
+    (tree / LOCK_NAME).write_text("{not json\n}")
+    assert main(["check", "--spec", str(tree / "oathgate.toml")]) == 2
+
+def test_writing_lock_does_not_change_hash(tree):
+    spec_path = tree / "oathgate.toml"
+    before, _, _ = compute_ruler(spec_path)
+
+    assert main(["predict", "--spec", str(spec_path), "--metric", "accuracy", "--at-least", "0.85"]) == 0
+
+    after, _, _ = compute_ruler(spec_path)
+    assert after == before
+
+def test_unreferenced_file_does_not_change_hash(tree):
+    spec_path = tree / "oathgate.toml"
+    before, _, _ = compute_ruler(spec_path)
+
+    (tree / "notes.md").write_text("scratch\n")
+    (tree / "data.csv.bak").write_text("id,lebel\n1,fox\n")
+
+    after, _, _ = compute_ruler(spec_path)
+    assert after == before
+
+def test_at_most_records_the_other_operator(tree):
+    spec = str(tree / "oathgate.toml")
+
+    assert main(["predict", "--spec", spec,
+                 "--metric", "accuracy", "--at-most", "0.10"]) == 0
+
+    lock = read_lock(tree / LOCK_NAME)
+    assert lock["predictions"][0]["operator"] == "<="
+    assert lock["predictions"][0]["value"] == 0.10

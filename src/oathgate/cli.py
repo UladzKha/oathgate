@@ -8,7 +8,7 @@ from pathlib import Path
 from oathgate.spec import SpecError, compute_ruler
 from oathgate.lock import LOCK_NAME, read_lock, verify, write_lock
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="oathgate")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -29,7 +29,7 @@ def main() -> int:
     check.add_argument("--spec", default="oathgate.toml", help="Path to the spec file")
     check.add_argument("--lock", default=None, help="Path to the lock file")
 
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     try:
     
