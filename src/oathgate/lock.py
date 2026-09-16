@@ -55,6 +55,9 @@ def write_lock(
         os.replace(tmp_path, lock_path)
     except OSError as e:
         raise SpecError(f"cannot write {lock_path}: {e}") from e
+    finally:
+        # A successful os.replace has already moved it away; missing_ok covers that.
+        tmp_path.unlink(missing_ok=True)
 
     return lock
 
@@ -73,6 +76,9 @@ def read_lock(lock_path: Path) -> dict[str, Any]:
     expected = lock.get("ruler_hash")
     if not isinstance(expected, str):
         raise SpecError(f"{lock_path}: ruler_hash is missing or not a string")
+
+    if "history" in lock and not isinstance(lock["history"], list):
+        raise SpecError(f"{lock_path}: history is not a list")
 
     return lock
 

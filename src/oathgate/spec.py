@@ -122,11 +122,17 @@ def load_spec(path: str | Path) -> dict[str, Any]:
     if "dataset" not in spec:
         raise SpecError(f"missing [dataset] section in {path}")
 
+    if not isinstance(spec["dataset"], dict):
+        raise SpecError(f"[dataset] must be a section in {path}")
+
     if "path" not in spec["dataset"]:
         raise SpecError(f"missing [dataset].path in {path}")
 
     if "metrics" not in spec:
         raise SpecError(f"missing [metrics] section in {path}")
+
+    if not isinstance(spec["metrics"], dict):
+        raise SpecError(f"[metrics] must be a section in {path}")
 
     if not spec["metrics"]:
         raise SpecError(f"empty [metrics] section in {path}")
@@ -137,6 +143,9 @@ def load_spec(path: str | Path) -> dict[str, Any]:
     spec["dataset"]["path"] = _normalize_path(spec["dataset"]["path"], where="dataset.path")
 
     for name, metric in spec["metrics"].items():
+        if not isinstance(metric, dict):
+            raise SpecError(f"[metrics].{name} must be a section in {path}")
+
         if "impl" not in metric:
             raise SpecError(f"missing [metrics].{name}.impl in {path}")
 
@@ -163,21 +172,28 @@ def load_spec(path: str | Path) -> dict[str, Any]:
     return spec
 
 def collect_files(spec: dict[str, Any], base_dir: Path) -> dict[str, bytes]:
+    """Read every file the spec names, keyed by its NFC-normalized path.
+
+    The file is read through the path exactly as the spec spells it, since on
+    disk a name is bytes and an NFC path will not find a file stored in NFD.
+    The key is only an identity label inside the payload, so it is normalized
+    to match the NFC form the spec half of the payload is canonicalized to.
+    """
     result: dict[str, bytes] = {}
     path_str = spec["dataset"]["path"]
     full_path = base_dir / path_str
 
     try:
-        result[path_str] = full_path.read_bytes()
+        result[unicodedata.normalize("NFC", path_str)] = full_path.read_bytes()
     except OSError as e:
         raise SpecError(f"cannot read {path_str}: {e}") from e
 
-    for name, metric in spec["metrics"].items():
+    for _, metric in spec["metrics"].items():
         impl_path = metric["impl"]
         full_impl_path = base_dir / impl_path
 
         try:
-            result[impl_path] = full_impl_path.read_bytes()
+            result[unicodedata.normalize("NFC", impl_path)] = full_impl_path.read_bytes()
         except OSError as e:
             raise SpecError(f"cannot read {impl_path}: {e}") from e
 
@@ -186,7 +202,7 @@ def collect_files(spec: dict[str, Any], base_dir: Path) -> dict[str, bytes]:
                 full_extra_path = base_dir / extra_path
 
                 try:
-                    result[extra_path] = full_extra_path.read_bytes()
+                    result[unicodedata.normalize("NFC", extra_path)] = full_extra_path.read_bytes()
                 except OSError as e:
                     raise SpecError(f"cannot read {extra_path}: {e}") from e
 
