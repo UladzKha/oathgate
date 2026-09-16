@@ -7,5 +7,4 @@ build/
 *.egg-info/
 .pytest_cache/
 .DS_Store
-/oathgate.lock
 oathgate.lock.tmp

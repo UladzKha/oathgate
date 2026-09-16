@@ -1,0 +1,15 @@
+{
+  "frozen_at": "2026-09-16T12:37:06+00:00",
+  "history": [],
+  "predictions": [
+    {
+      "metric": "accuracy",
+      "note": "guards the README example",
+      "operator": ">=",
+      "value": 0.9
+    }
+  ],
+  "ruler_hash": "90d4af4923f4ca466021ab36e24e5fc749eaf6108a7bbf56c13d73faba7baf0c",
+  "spec_path": "oathgate.toml",
+  "version": 1
+}

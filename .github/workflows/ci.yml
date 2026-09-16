@@ -27,7 +27,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e .
           pip install pytest
+
+      - name: Check the ruler
+        run: uv run oathgate check
  
       - name: Run tests
         run: pytest -q
- 
